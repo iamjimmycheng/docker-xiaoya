@@ -131,6 +131,7 @@ open_token=""
 folder_id=""
 quark_cookie=""
 pan115_cookie=""
+aliyun_to_115="false"
 
 # 如果是更新服务，则从原有的compose配置中获取token等信息
 if [ "${update}" != "0" ]; then
@@ -139,6 +140,7 @@ if [ "${update}" != "0" ]; then
   folder_id=$(grep ALIYUN_FOLDER_ID "$install_path/env" 2> /dev/null | cut -d '=' -f2-)
   quark_cookie=$(grep QUARK_COOKIE "$install_path/env" 2> /dev/null | cut -d '=' -f2-)
   pan115_cookie=$(grep PAN115_COOKIE "$install_path/env" 2> /dev/null | cut -d '=' -f2-)
+  aliyun_to_115=$(grep ALIYUN_TO_115 "$install_path/env" 2> /dev/null | cut -d '=' -f2-)
 fi
 
 # 让用户输入阿里云盘TOKEN，token获取方式教程：https://alist.nn.ci/zh/guide/drivers/aliyundrive.html 
@@ -181,13 +183,22 @@ echo "登陆115网盘，浏览器F12，点击network，随便点一个请求，�
 read -rp "请输入115网盘Cookie值(默认为$pan115_cookie): " res
 pan115_cookie=${res:=$pan115_cookie}
 
+if [ -n "${pan115_cookie}" ]; then
+  read -rp "是否开启将阿里云盘转存到115播放？[y/n]: " res
+  if [ "${res}" = "y" ]; then
+    aliyun_to_115="true"
+  else
+    aliyun_to_115="false"
+  fi
+fi
+
 # 选择部署服务类型，alist + emby (默认), alist, alist + jellyfin, alist + emby + jellyfin
 echo
 echo "部署类型："
 echo "1. alist + emby (默认)"
 echo "2. alist"
-echo "3. alist + jellyfin"
-echo "4. alist + emby + jellyfin"
+# echo "3. alist + jellyfin"
+# echo "4. alist + emby + jellyfin"
 read -rp "请选择部署服务类型: " service_type
 case $service_type in
   1)
@@ -225,6 +236,7 @@ sedsh "s#ALIYUN_OPEN_TOKEN=.*#ALIYUN_OPEN_TOKEN=$open_token#g" env
 sedsh "s#ALIYUN_FOLDER_ID=.*#ALIYUN_FOLDER_ID=$folder_id#g" env
 sedsh "s#QUARK_COOKIE=.*#QUARK_COOKIE=$quark_cookie#g" env
 sedsh "s#PAN115_COOKIE=.*#PAN115_COOKIE=$pan115_cookie#g" env
+sedsh "s#ALIYUN_TO_115=.*#ALIYUN_TO_115=$aliyun_to_115#g" env
 
 if [ -n "$IMAGE_PROXY" ]; then
   sedsh -E "s#image: [^/]+#image: ${IMAGE_PROXY}#g" docker-compose.yml
@@ -262,6 +274,7 @@ echo "启动服务：$install_path/manage.sh start"
 echo "停止服务：$install_path/manage.sh stop"
 echo "重启服务：$install_path/manage.sh restart"
 echo "加载配置：$install_path/manage.sh reload"
+echo "更新服务：$install_path/manage.sh update"
 echo "高级用户自定义配置：$install_path/env"
 echo "修改env或者compose配置后，需要执行上面的加载配置reload命令生效！"
 
@@ -310,8 +323,11 @@ case \$1 in
   logs)
     $DOCKER_COMPOSE -f "$install_path/docker-compose.yml" logs -f
     ;;
+  update)
+    $DOCKER_COMPOSE -f "$install_path/docker-compose.yml" up --remove-orphans --pull=always -d 
+    ;;
   *)
-    echo "Usage: \$0 {start|stop|restart|reload|logs}"
+    echo "Usage: \$0 {start|stop|restart|reload|logs|update}"
     exit 1
     ;;
 esac
